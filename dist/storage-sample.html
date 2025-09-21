@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Storage サンプル - Local Storage & Session Storage</title>
+    <link rel="stylesheet" href="css/storage-style.css">
+</head>
+<body>
+    <h1>Web Storage サンプルアプリケーション</h1>
+
+    <div class="container">
+        <h2>Local Storage（永続的なストレージ）</h2>
+        <div class="storage-section">
+            <div class="form-group">
+                <label>キー:</label>
+                <input type="text" id="localKey" placeholder="キーを入力">
+            </div>
+            <div class="form-group">
+                <label>値:</label>
+                <input type="text" id="localValue" placeholder="値を入力">
+            </div>
+            <div class="button-group">
+                <button onclick="setLocalStorage()">保存</button>
+                <button onclick="getLocalStorage()">取得</button>
+                <button onclick="removeLocalStorage()">削除</button>
+                <button onclick="clearLocalStorage()" class="danger">全削除</button>
+            </div>
+        </div>
+
+        <div class="storage-display">
+            <h3>Local Storage 内容:</h3>
+            <div id="localStorageList"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Session Storage（セッション限定ストレージ）</h2>
+        <div class="storage-section">
+            <div class="form-group">
+                <label>キー:</label>
+                <input type="text" id="sessionKey" placeholder="キーを入力">
+            </div>
+            <div class="form-group">
+                <label>値:</label>
+                <input type="text" id="sessionValue" placeholder="値を入力">
+            </div>
+            <div class="button-group">
+                <button onclick="setSessionStorage()">保存</button>
+                <button onclick="getSessionStorage()">取得</button>
+                <button onclick="removeSessionStorage()">削除</button>
+                <button onclick="clearSessionStorage()" class="danger">全削除</button>
+            </div>
+        </div>
+
+        <div class="storage-display">
+            <h3>Session Storage 内容:</h3>
+            <div id="sessionStorageList"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>JSONデータの保存・取得</h2>
+        <div class="storage-section">
+            <div class="form-group">
+                <label>名前:</label>
+                <input type="text" id="userName" placeholder="名前を入力">
+            </div>
+            <div class="form-group">
+                <label>年齢:</label>
+                <input type="number" id="userAge" placeholder="年齢を入力">
+            </div>
+            <div class="form-group">
+                <label>職業:</label>
+                <input type="text" id="userJob" placeholder="職業を入力">
+            </div>
+            <div class="form-group">
+                <label>保存先:</label>
+                <select id="storageType">
+                    <option value="local">Local Storage</option>
+                    <option value="session">Session Storage</option>
+                </select>
+            </div>
+            <div class="button-group">
+                <button onclick="saveUserData()">ユーザーデータ保存</button>
+                <button onclick="loadUserData()">ユーザーデータ読み込み</button>
+                <button onclick="clearUserData()">ユーザーデータ削除</button>
+            </div>
+        </div>
+
+        <div class="storage-display">
+            <h3>保存されたユーザーデータ:</h3>
+            <div id="userDataDisplay"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>ストレージ情報</h2>
+        <div class="info-section">
+            <button onclick="showStorageInfo()">ストレージ情報取得</button>
+            <div id="storageInfo"></div>
+        </div>
+    </div>
+
+    <div id="status" class="status"></div>
+
+    <script>
+        function showStatus(message, isError = false) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${isError ? 'error' : 'success'}`;
+            setTimeout(() => {
+                statusDiv.textContent = '';
+                statusDiv.className = 'status';
+            }, 3000);
+        }
+
+        // Local Storage 操作
+        function setLocalStorage() {
+            const key = document.getElementById('localKey').value;
+            const value = document.getElementById('localValue').value;
+
+            if (!key || !value) {
+                showStatus('キーと値を入力してください', true);
+                return;
+            }
+
+            try {
+                localStorage.setItem(key, value);
+                showStatus('Local Storageに保存しました');
+                document.getElementById('localKey').value = '';
+                document.getElementById('localValue').value = '';
+                displayLocalStorage();
+            } catch (error) {
+                showStatus('保存に失敗しました: ' + error.message, true);
+            }
+        }
+
+        function getLocalStorage() {
+            const key = document.getElementById('localKey').value;
+
+            if (!key) {
+                showStatus('キーを入力してください', true);
+                return;
+            }
+
+            const value = localStorage.getItem(key);
+            if (value !== null) {
+                document.getElementById('localValue').value = value;
+                showStatus('値を取得しました');
+            } else {
+                showStatus('指定されたキーは存在しません', true);
+            }
+        }
+
+        function removeLocalStorage() {
+            const key = document.getElementById('localKey').value;
+
+            if (!key) {
+                showStatus('キーを入力してください', true);
+                return;
+            }
+
+            localStorage.removeItem(key);
+            showStatus('アイテムを削除しました');
+            document.getElementById('localKey').value = '';
+            displayLocalStorage();
+        }
+
+        function clearLocalStorage() {
+            if (confirm('Local Storageのすべてのデータを削除しますか？')) {
+                localStorage.clear();
+                showStatus('Local Storageをクリアしました');
+                displayLocalStorage();
+            }
+        }
+
+        // Session Storage 操作
+        function setSessionStorage() {
+            const key = document.getElementById('sessionKey').value;
+            const value = document.getElementById('sessionValue').value;
+
+            if (!key || !value) {
+                showStatus('キーと値を入力してください', true);
+                return;
+            }
+
+            try {
+                sessionStorage.setItem(key, value);
+                showStatus('Session Storageに保存しました');
+                document.getElementById('sessionKey').value = '';
+                document.getElementById('sessionValue').value = '';
+                displaySessionStorage();
+            } catch (error) {
+                showStatus('保存に失敗しました: ' + error.message, true);
+            }
+        }
+
+        function getSessionStorage() {
+            const key = document.getElementById('sessionKey').value;
+
+            if (!key) {
+                showStatus('キーを入力してください', true);
+                return;
+            }
+
+            const value = sessionStorage.getItem(key);
+            if (value !== null) {
+                document.getElementById('sessionValue').value = value;
+                showStatus('値を取得しました');
+            } else {
+                showStatus('指定されたキーは存在しません', true);
+            }
+        }
+
+        function removeSessionStorage() {
+            const key = document.getElementById('sessionKey').value;
+
+            if (!key) {
+                showStatus('キーを入力してください', true);
+                return;
+            }
+
+            sessionStorage.removeItem(key);
+            showStatus('アイテムを削除しました');
+            document.getElementById('sessionKey').value = '';
+            displaySessionStorage();
+        }
+
+        function clearSessionStorage() {
+            if (confirm('Session Storageのすべてのデータを削除しますか？')) {
+                sessionStorage.clear();
+                showStatus('Session Storageをクリアしました');
+                displaySessionStorage();
+            }
+        }
+
+        // JSON データ操作
+        function saveUserData() {
+            const name = document.getElementById('userName').value;
+            const age = document.getElementById('userAge').value;
+            const job = document.getElementById('userJob').value;
+            const storageType = document.getElementById('storageType').value;
+
+            if (!name || !age || !job) {
+                showStatus('すべての項目を入力してください', true);
+                return;
+            }
+
+            const userData = {
+                name: name,
+                age: parseInt(age),
+                job: job,
+                savedAt: new Date().toLocaleString('ja-JP')
+            };
+
+            try {
+                const jsonData = JSON.stringify(userData);
+                if (storageType === 'local') {
+                    localStorage.setItem('userData', jsonData);
+                } else {
+                    sessionStorage.setItem('userData', jsonData);
+                }
+
+                showStatus(`ユーザーデータを${storageType === 'local' ? 'Local' : 'Session'} Storageに保存しました`);
+                clearUserForm();
+                displayUserData();
+                displayLocalStorage();
+                displaySessionStorage();
+            } catch (error) {
+                showStatus('保存に失敗しました: ' + error.message, true);
+            }
+        }
+
+        function loadUserData() {
+            const storageType = document.getElementById('storageType').value;
+
+            let jsonData;
+            if (storageType === 'local') {
+                jsonData = localStorage.getItem('userData');
+            } else {
+                jsonData = sessionStorage.getItem('userData');
+            }
+
+            if (jsonData) {
+                try {
+                    const userData = JSON.parse(jsonData);
+                    document.getElementById('userName').value = userData.name;
+                    document.getElementById('userAge').value = userData.age;
+                    document.getElementById('userJob').value = userData.job;
+                    showStatus('ユーザーデータを読み込みました');
+                } catch (error) {
+                    showStatus('データの読み込みに失敗しました: ' + error.message, true);
+                }
+            } else {
+                showStatus('ユーザーデータが見つかりません', true);
+            }
+        }
+
+        function clearUserData() {
+            localStorage.removeItem('userData');
+            sessionStorage.removeItem('userData');
+            showStatus('ユーザーデータを削除しました');
+            displayUserData();
+            displayLocalStorage();
+            displaySessionStorage();
+        }
+
+        function clearUserForm() {
+            document.getElementById('userName').value = '';
+            document.getElementById('userAge').value = '';
+            document.getElementById('userJob').value = '';
+        }
+
+        // 表示機能
+        function displayLocalStorage() {
+            const list = document.getElementById('localStorageList');
+            list.innerHTML = '';
+
+            if (localStorage.length === 0) {
+                list.innerHTML = '<p>データがありません</p>';
+                return;
+            }
+
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const value = localStorage.getItem(key);
+                const item = document.createElement('div');
+                item.className = 'storage-item';
+                item.innerHTML = `<strong>${key}:</strong> ${value}`;
+                list.appendChild(item);
+            }
+        }
+
+        function displaySessionStorage() {
+            const list = document.getElementById('sessionStorageList');
+            list.innerHTML = '';
+
+            if (sessionStorage.length === 0) {
+                list.innerHTML = '<p>データがありません</p>';
+                return;
+            }
+
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                const value = sessionStorage.getItem(key);
+                const item = document.createElement('div');
+                item.className = 'storage-item';
+                item.innerHTML = `<strong>${key}:</strong> ${value}`;
+                list.appendChild(item);
+            }
+        }
+
+        function displayUserData() {
+            const display = document.getElementById('userDataDisplay');
+
+            const localUserData = localStorage.getItem('userData');
+            const sessionUserData = sessionStorage.getItem('userData');
+
+            let html = '';
+
+            if (localUserData) {
+                try {
+                    const data = JSON.parse(localUserData);
+                    html += `
+                        <div class="user-data-item">
+                            <h4>Local Storage のユーザーデータ:</h4>
+                            <p><strong>名前:</strong> ${data.name}</p>
+                            <p><strong>年齢:</strong> ${data.age}</p>
+                            <p><strong>職業:</strong> ${data.job}</p>
+                            <p><strong>保存日時:</strong> ${data.savedAt}</p>
+                        </div>
+                    `;
+                } catch (error) {
+                    html += '<p>Local Storage のデータが破損しています</p>';
+                }
+            }
+
+            if (sessionUserData) {
+                try {
+                    const data = JSON.parse(sessionUserData);
+                    html += `
+                        <div class="user-data-item">
+                            <h4>Session Storage のユーザーデータ:</h4>
+                            <p><strong>名前:</strong> ${data.name}</p>
+                            <p><strong>年齢:</strong> ${data.age}</p>
+                            <p><strong>職業:</strong> ${data.job}</p>
+                            <p><strong>保存日時:</strong> ${data.savedAt}</p>
+                        </div>
+                    `;
+                } catch (error) {
+                    html += '<p>Session Storage のデータが破損しています</p>';
+                }
+            }
+
+            if (!localUserData && !sessionUserData) {
+                html = '<p>ユーザーデータがありません</p>';
+            }
+
+            display.innerHTML = html;
+        }
+
+        function showStorageInfo() {
+            const info = document.getElementById('storageInfo');
+
+            // ストレージ使用量を概算で計算
+            function getStorageSize(storage) {
+                let size = 0;
+                for (let key in storage) {
+                    if (storage.hasOwnProperty(key)) {
+                        size += storage[key].length + key.length;
+                    }
+                }
+                return size;
+            }
+
+            const localSize = getStorageSize(localStorage);
+            const sessionSize = getStorageSize(sessionStorage);
+
+            info.innerHTML = `
+                <div class="info-display">
+                    <h4>Local Storage:</h4>
+                    <p>アイテム数: ${localStorage.length}</p>
+                    <p>使用量(概算): ${localSize} バイト</p>
+
+                    <h4>Session Storage:</h4>
+                    <p>アイテム数: ${sessionStorage.length}</p>
+                    <p>使用量(概算): ${sessionSize} バイト</p>
+
+                    <h4>ブラウザサポート:</h4>
+                    <p>Local Storage: ${typeof(Storage) !== "undefined" && localStorage ? '対応' : '非対応'}</p>
+                    <p>Session Storage: ${typeof(Storage) !== "undefined" && sessionStorage ? '対応' : '非対応'}</p>
+                </div>
+            `;
+        }
+
+        // ページ読み込み時の初期化
+        window.addEventListener('load', function() {
+            displayLocalStorage();
+            displaySessionStorage();
+            displayUserData();
+        });
+
+        // Storage イベントリスナー（他のタブでの変更を検知）
+        window.addEventListener('storage', function(e) {
+            if (e.storageArea === localStorage) {
+                displayLocalStorage();
+                displayUserData();
+                showStatus('他のタブでLocal Storageが変更されました');
+            }
+        });
+    </script>
+</body>
+</html>
