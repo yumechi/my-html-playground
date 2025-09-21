@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IndexedDB サンプル</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        
+        h2 {
+            color: #666;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        button.danger {
+            background-color: #dc3545;
+        }
+        
+        button.danger:hover {
+            background-color: #c82333;
+        }
+        
+        input, select {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .form-group {
+            margin: 10px 0;
+        }
+        
+        label {
+            display: inline-block;
+            width: 100px;
+            font-weight: bold;
+        }
+        
+        #dataList {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .data-item {
+            background-color: white;
+            margin: 5px 0;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .data-item strong {
+            color: #333;
+        }
+        
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <h1>IndexedDB サンプルアプリケーション</h1>
+    
+    <div class="container">
+        <h2>データベース操作</h2>
+        <button onclick="initDB()">データベース初期化</button>
+        <button onclick="generateSampleData()">サンプルデータ生成</button>
+        <button onclick="clearAllData()" class="danger">全データ削除</button>
+        <div id="status" class="status"></div>
+    </div>
+    
+    <div class="container">
+        <h2>データ追加・更新</h2>
+        <div class="form-group">
+            <label>ID:</label>
+            <input type="number" id="itemId" placeholder="更新時のみ指定">
+        </div>
+        <div class="form-group">
+            <label>名前:</label>
+            <input type="text" id="itemName" placeholder="名前を入力">
+        </div>
+        <div class="form-group">
+            <label>年齢:</label>
+            <input type="number" id="itemAge" placeholder="年齢を入力">
+        </div>
+        <div class="form-group">
+            <label>職業:</label>
+            <input type="text" id="itemJob" placeholder="職業を入力">
+        </div>
+        <button onclick="addOrUpdateData()">追加・更新</button>
+    </div>
+    
+    <div class="container">
+        <h2>データ検索</h2>
+        <div class="form-group">
+            <label>検索:</label>
+            <input type="text" id="searchTerm" placeholder="名前で検索">
+            <button onclick="searchData()">検索</button>
+            <button onclick="loadAllData()">全件表示</button>
+        </div>
+    </div>
+    
+    <div class="container">
+        <h2>データ一覧</h2>
+        <div id="dataList"></div>
+    </div>
+    
+    <script>
+        let db;
+        const DB_NAME = 'SampleDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'people';
+
+        function showStatus(message, isError = false) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${isError ? 'error' : 'success'}`;
+            setTimeout(() => {
+                statusDiv.textContent = '';
+                statusDiv.className = 'status';
+            }, 3000);
+        }
+
+        function initDB() {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            
+            request.onerror = function(event) {
+                console.error('データベースエラー:', event.target.error);
+                showStatus('データベースの初期化に失敗しました', true);
+            };
+            
+            request.onsuccess = function(event) {
+                db = event.target.result;
+                console.log('データベース初期化完了');
+                showStatus('データベースが正常に初期化されました');
+                loadAllData();
+            };
+            
+            request.onupgradeneeded = function(event) {
+                db = event.target.result;
+                
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    const objectStore = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                    objectStore.createIndex('name', 'name', { unique: false });
+                    objectStore.createIndex('age', 'age', { unique: false });
+                    objectStore.createIndex('job', 'job', { unique: false });
+                }
+            };
+        }
+
+        function generateSampleData() {
+            if (!db) {
+                showStatus('先にデータベースを初期化してください', true);
+                return;
+            }
+
+            const sampleData = [
+                { name: '田中太郎', age: 30, job: 'エンジニア' },
+                { name: '佐藤花子', age: 25, job: 'デザイナー' },
+                { name: '鈴木一郎', age: 35, job: 'マネージャー' },
+                { name: '高橋美咲', age: 28, job: 'マーケター' },
+                { name: '伊藤健太', age: 32, job: 'プロダクトオーナー' }
+            ];
+
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const objectStore = transaction.objectStore(STORE_NAME);
+
+            sampleData.forEach(data => {
+                objectStore.add(data);
+            });
+
+            transaction.oncomplete = function() {
+                showStatus('サンプルデータを生成しました');
+                loadAllData();
+            };
+
+            transaction.onerror = function(event) {
+                console.error('データ追加エラー:', event.target.error);
+                showStatus('サンプルデータの生成に失敗しました', true);
+            };
+        }
+
+        function addOrUpdateData() {
+            if (!db) {
+                showStatus('先にデータベースを初期化してください', true);
+                return;
+            }
+
+            const id = document.getElementById('itemId').value;
+            const name = document.getElementById('itemName').value;
+            const age = parseInt(document.getElementById('itemAge').value);
+            const job = document.getElementById('itemJob').value;
+
+            if (!name || !age || !job) {
+                showStatus('すべての項目を入力してください', true);
+                return;
+            }
+
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const objectStore = transaction.objectStore(STORE_NAME);
+
+            const data = { name, age, job };
+            if (id) {
+                data.id = parseInt(id);
+                objectStore.put(data);
+            } else {
+                objectStore.add(data);
+            }
+
+            transaction.oncomplete = function() {
+                showStatus(id ? 'データを更新しました' : 'データを追加しました');
+                clearForm();
+                loadAllData();
+            };
+
+            transaction.onerror = function(event) {
+                console.error('データ操作エラー:', event.target.error);
+                showStatus('データの操作に失敗しました', true);
+            };
+        }
+
+        function searchData() {
+            if (!db) {
+                showStatus('先にデータベースを初期化してください', true);
+                return;
+            }
+
+            const searchTerm = document.getElementById('searchTerm').value.toLowerCase();
+            if (!searchTerm) {
+                loadAllData();
+                return;
+            }
+
+            const transaction = db.transaction([STORE_NAME], 'readonly');
+            const objectStore = transaction.objectStore(STORE_NAME);
+            const request = objectStore.getAll();
+
+            request.onsuccess = function(event) {
+                const allData = event.target.result;
+                const filteredData = allData.filter(item => 
+                    item.name.toLowerCase().includes(searchTerm)
+                );
+                displayData(filteredData);
+            };
+        }
+
+        function loadAllData() {
+            if (!db) {
+                return;
+            }
+
+            const transaction = db.transaction([STORE_NAME], 'readonly');
+            const objectStore = transaction.objectStore(STORE_NAME);
+            const request = objectStore.getAll();
+
+            request.onsuccess = function(event) {
+                const data = event.target.result;
+                displayData(data);
+            };
+        }
+
+        function displayData(data) {
+            const dataList = document.getElementById('dataList');
+            
+            if (data.length === 0) {
+                dataList.innerHTML = '<p>データがありません</p>';
+                return;
+            }
+
+            dataList.innerHTML = data.map(item => `
+                <div class="data-item">
+                    <strong>ID:</strong> ${item.id}<br>
+                    <strong>名前:</strong> ${item.name}<br>
+                    <strong>年齢:</strong> ${item.age}<br>
+                    <strong>職業:</strong> ${item.job}<br>
+                    <button onclick="editData(${item.id}, '${item.name}', ${item.age}, '${item.job}')">編集</button>
+                    <button onclick="deleteData(${item.id})" class="danger">削除</button>
+                </div>
+            `).join('');
+        }
+
+        function editData(id, name, age, job) {
+            document.getElementById('itemId').value = id;
+            document.getElementById('itemName').value = name;
+            document.getElementById('itemAge').value = age;
+            document.getElementById('itemJob').value = job;
+        }
+
+        function deleteData(id) {
+            if (!db) {
+                showStatus('先にデータベースを初期化してください', true);
+                return;
+            }
+
+            if (!confirm('このデータを削除しますか？')) {
+                return;
+            }
+
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const objectStore = transaction.objectStore(STORE_NAME);
+            const request = objectStore.delete(id);
+
+            request.onsuccess = function() {
+                showStatus('データを削除しました');
+                loadAllData();
+            };
+
+            request.onerror = function(event) {
+                console.error('削除エラー:', event.target.error);
+                showStatus('データの削除に失敗しました', true);
+            };
+        }
+
+        function clearAllData() {
+            if (!db) {
+                showStatus('先にデータベースを初期化してください', true);
+                return;
+            }
+
+            if (!confirm('すべてのデータを削除しますか？この操作は取り消せません。')) {
+                return;
+            }
+
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const objectStore = transaction.objectStore(STORE_NAME);
+            const request = objectStore.clear();
+
+            request.onsuccess = function() {
+                showStatus('すべてのデータを削除しました');
+                loadAllData();
+            };
+
+            request.onerror = function(event) {
+                console.error('全削除エラー:', event.target.error);
+                showStatus('データの削除に失敗しました', true);
+            };
+        }
+
+        function clearForm() {
+            document.getElementById('itemId').value = '';
+            document.getElementById('itemName').value = '';
+            document.getElementById('itemAge').value = '';
+            document.getElementById('itemJob').value = '';
+        }
+
+        window.addEventListener('load', function() {
+            initDB();
+        });
+    </script>
+</body>
+</html>
