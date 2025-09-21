@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Workers サンプル</title>
+    <link rel="stylesheet" href="css/serviceworkers-style.css">
+</head>
+<body>
+    <h1>Service Workers サンプルアプリケーション</h1>
+
+    <div class="container">
+        <h2>Service Workersとは</h2>
+        <div class="info-section">
+            <p>Service Workers は、ウェブアプリケーションとネットワークの間でプロキシとして動作するスクリプトです。</p>
+            <ul>
+                <li>バックグラウンドでの処理実行</li>
+                <li>ネットワークリクエストのインターセプト</li>
+                <li>キャッシュ管理によるオフライン対応</li>
+                <li>プッシュ通知の受信</li>
+                <li>バックグラウンド同期</li>
+            </ul>
+            <div class="warning" id="httpsWarning" style="display: none;">
+                <strong>注意:</strong> Service Workers は HTTPS または localhost でのみ動作します。
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Service Worker の状態</h2>
+        <div class="status-section">
+            <div class="status-grid">
+                <div class="status-item">
+                    <div class="status-label">ブラウザサポート:</div>
+                    <div id="browserSupport" class="status-value">確認中...</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Service Worker状態:</div>
+                    <div id="swStatus" class="status-value">未登録</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">キャッシュサイズ:</div>
+                    <div id="cacheSize" class="status-value">0 アイテム</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">最終更新:</div>
+                    <div id="lastUpdate" class="status-value">-</div>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button onclick="registerServiceWorker()">Service Worker 登録</button>
+                <button onclick="unregisterServiceWorker()" class="danger">Service Worker 解除</button>
+                <button onclick="updateServiceWorker()">強制更新</button>
+                <button onclick="checkStatus()">状態確認</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>キャッシュ管理</h2>
+        <div class="cache-section">
+            <div class="form-group">
+                <label>キャッシュするURL:</label>
+                <input type="url" id="cacheUrl" placeholder="https://example.com/api/data" value="https://jsonplaceholder.typicode.com/posts/1">
+            </div>
+            <div class="button-group">
+                <button onclick="addToCache()">キャッシュに追加</button>
+                <button onclick="removeFromCache()">キャッシュから削除</button>
+                <button onclick="clearAllCache()" class="danger">全キャッシュ削除</button>
+                <button onclick="listCacheContents()">キャッシュ内容確認</button>
+            </div>
+
+            <div class="cache-contents">
+                <h3>キャッシュ内容:</h3>
+                <div id="cacheList" class="cache-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>ネットワークリクエストテスト</h2>
+        <div class="network-section">
+            <div class="form-group">
+                <label>リクエストURL:</label>
+                <input type="url" id="requestUrl" placeholder="https://example.com/api" value="https://jsonplaceholder.typicode.com/posts/1">
+            </div>
+            <div class="form-group">
+                <label>リクエスト方法:</label>
+                <select id="requestMethod">
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="DELETE">DELETE</option>
+                </select>
+            </div>
+            <div class="button-group">
+                <button onclick="sendRequest()">リクエスト送信</button>
+                <button onclick="sendOfflineRequest()">オフライン時リクエスト</button>
+                <button onclick="simulateOffline()">オフライン状態シミュレート</button>
+                <button onclick="goOnline()">オンライン状態に戻す</button>
+            </div>
+
+            <div class="network-status">
+                <div>ネットワーク状態: <span id="networkStatus">オンライン</span></div>
+                <div>最後のリクエスト: <span id="lastRequest">-</span></div>
+            </div>
+        </div>
+
+        <div class="output-section">
+            <h3>リクエスト結果:</h3>
+            <div id="requestOutput" class="output-display"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>バックグラウンド同期テスト</h2>
+        <div class="sync-section">
+            <div class="form-group">
+                <label>同期データ:</label>
+                <textarea id="syncData" placeholder="同期するデータを入力" rows="3">{"message": "Hello from background sync", "timestamp": "now"}</textarea>
+            </div>
+            <div class="button-group">
+                <button onclick="registerBackgroundSync()">バックグラウンド同期登録</button>
+                <button onclick="triggerSync()">同期実行</button>
+                <button onclick="checkSyncStatus()">同期状態確認</button>
+            </div>
+
+            <div class="sync-status">
+                <h3>同期ステータス:</h3>
+                <div id="syncStatusDisplay" class="status-display"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>通知テスト</h2>
+        <div class="notification-section">
+            <div class="form-group">
+                <label>通知タイトル:</label>
+                <input type="text" id="notificationTitle" placeholder="通知のタイトル" value="Service Worker からの通知">
+            </div>
+            <div class="form-group">
+                <label>通知内容:</label>
+                <textarea id="notificationBody" placeholder="通知の内容" rows="2">Service Worker が正常に動作しています！</textarea>
+            </div>
+            <div class="button-group">
+                <button onclick="requestNotificationPermission()">通知許可要求</button>
+                <button onclick="showNotification()">通知表示</button>
+                <button onclick="showPersistentNotification()">永続通知表示</button>
+            </div>
+
+            <div class="notification-status">
+                <div>通知許可状態: <span id="notificationPermission">確認中...</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>デバッグ情報</h2>
+        <div class="debug-section">
+            <div class="button-group">
+                <button onclick="showServiceWorkerDetails()">Service Worker詳細</button>
+                <button onclick="showCacheDetails()">キャッシュ詳細</button>
+                <button onclick="exportDebugInfo()">デバッグ情報エクスポート</button>
+                <button onclick="clearAllData()" class="danger">全データ削除</button>
+            </div>
+
+            <div class="debug-output">
+                <h3>デバッグ情報:</h3>
+                <div id="debugOutput" class="output-display"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="status" class="status"></div>
+
+    <script>
+        let serviceWorkerRegistration = null;
+        let isOfflineMode = false;
+
+        function showStatus(message, isError = false) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${isError ? 'error' : 'success'}`;
+            setTimeout(() => {
+                statusDiv.textContent = '';
+                statusDiv.className = 'status';
+            }, 5000);
+        }
+
+        function addOutput(containerId, message, isError = false) {
+            const container = document.getElementById(containerId);
+            const timestamp = new Date().toLocaleTimeString('ja-JP');
+            const div = document.createElement('div');
+            div.className = `output-item ${isError ? 'error' : ''}`;
+            div.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${message}`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // Service Worker 登録
+        async function registerServiceWorker() {
+            if (!('serviceWorker' in navigator)) {
+                showStatus('このブラウザはService Workersをサポートしていません', true);
+                return;
+            }
+
+            try {
+                // GitHub Pages 対応: 相対パスを使用
+                const registration = await navigator.serviceWorker.register('./sw.js', {
+                    scope: './'
+                });
+
+                serviceWorkerRegistration = registration;
+
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    addOutput('debugOutput', 'Service Worker の更新が見つかりました');
+
+                    newWorker.addEventListener('statechange', () => {
+                        addOutput('debugOutput', `Service Worker状態変更: ${newWorker.state}`);
+                        updateServiceWorkerStatus();
+                    });
+                });
+
+                addOutput('debugOutput', 'Service Worker が正常に登録されました');
+                showStatus('Service Worker を登録しました');
+                updateServiceWorkerStatus();
+
+            } catch (error) {
+                addOutput('debugOutput', `Service Worker 登録エラー: ${error.message}`, true);
+                showStatus('Service Worker の登録に失敗しました', true);
+            }
+        }
+
+        // Service Worker 解除
+        async function unregisterServiceWorker() {
+            if (!serviceWorkerRegistration) {
+                showStatus('Service Worker が登録されていません', true);
+                return;
+            }
+
+            try {
+                const result = await serviceWorkerRegistration.unregister();
+                if (result) {
+                    serviceWorkerRegistration = null;
+                    addOutput('debugOutput', 'Service Worker を解除しました');
+                    showStatus('Service Worker を解除しました');
+                    updateServiceWorkerStatus();
+                }
+            } catch (error) {
+                addOutput('debugOutput', `Service Worker 解除エラー: ${error.message}`, true);
+                showStatus('Service Worker の解除に失敗しました', true);
+            }
+        }
+
+        // Service Worker 更新
+        async function updateServiceWorker() {
+            if (!serviceWorkerRegistration) {
+                showStatus('Service Worker が登録されていません', true);
+                return;
+            }
+
+            try {
+                await serviceWorkerRegistration.update();
+                addOutput('debugOutput', 'Service Worker の更新を確認しました');
+                showStatus('Service Worker を更新しました');
+            } catch (error) {
+                addOutput('debugOutput', `Service Worker 更新エラー: ${error.message}`, true);
+                showStatus('Service Worker の更新に失敗しました', true);
+            }
+        }
+
+        // キャッシュ管理
+        async function addToCache() {
+            const url = document.getElementById('cacheUrl').value;
+            if (!url) {
+                showStatus('URLを入力してください', true);
+                return;
+            }
+
+            try {
+                const cache = await caches.open('sw-cache-v1');
+                await cache.add(url);
+                addOutput('debugOutput', `キャッシュに追加: ${url}`);
+                showStatus('キャッシュに追加しました');
+                updateCacheStatus();
+            } catch (error) {
+                addOutput('debugOutput', `キャッシュ追加エラー: ${error.message}`, true);
+                showStatus('キャッシュの追加に失敗しました', true);
+            }
+        }
+
+        async function removeFromCache() {
+            const url = document.getElementById('cacheUrl').value;
+            if (!url) {
+                showStatus('URLを入力してください', true);
+                return;
+            }
+
+            try {
+                const cache = await caches.open('sw-cache-v1');
+                const result = await cache.delete(url);
+                if (result) {
+                    addOutput('debugOutput', `キャッシュから削除: ${url}`);
+                    showStatus('キャッシュから削除しました');
+                } else {
+                    addOutput('debugOutput', `キャッシュに見つかりません: ${url}`, true);
+                    showStatus('指定されたURLはキャッシュにありません', true);
+                }
+                updateCacheStatus();
+            } catch (error) {
+                addOutput('debugOutput', `キャッシュ削除エラー: ${error.message}`, true);
+                showStatus('キャッシュの削除に失敗しました', true);
+            }
+        }
+
+        async function clearAllCache() {
+            if (!confirm('全てのキャッシュを削除しますか？')) {
+                return;
+            }
+
+            try {
+                const cacheNames = await caches.keys();
+                await Promise.all(cacheNames.map(name => caches.delete(name)));
+                addOutput('debugOutput', '全てのキャッシュを削除しました');
+                showStatus('全てのキャッシュを削除しました');
+                updateCacheStatus();
+            } catch (error) {
+                addOutput('debugOutput', `キャッシュ削除エラー: ${error.message}`, true);
+                showStatus('キャッシュの削除に失敗しました', true);
+            }
+        }
+
+        async function listCacheContents() {
+            try {
+                const cache = await caches.open('sw-cache-v1');
+                const requests = await cache.keys();
+
+                const cacheList = document.getElementById('cacheList');
+                cacheList.innerHTML = '';
+
+                if (requests.length === 0) {
+                    cacheList.innerHTML = '<div class="cache-item">キャッシュは空です</div>';
+                    return;
+                }
+
+                requests.forEach(request => {
+                    const div = document.createElement('div');
+                    div.className = 'cache-item';
+                    div.innerHTML = `
+                        <div class="cache-url">${request.url}</div>
+                        <div class="cache-method">${request.method}</div>
+                        <button onclick="removeSpecificCache('${request.url}')" class="cache-delete">削除</button>
+                    `;
+                    cacheList.appendChild(div);
+                });
+
+                addOutput('debugOutput', `キャッシュ内容を表示: ${requests.length} アイテム`);
+            } catch (error) {
+                addOutput('debugOutput', `キャッシュ確認エラー: ${error.message}`, true);
+            }
+        }
+
+        async function removeSpecificCache(url) {
+            try {
+                const cache = await caches.open('sw-cache-v1');
+                await cache.delete(url);
+                addOutput('debugOutput', `特定キャッシュを削除: ${url}`);
+                showStatus('キャッシュを削除しました');
+                listCacheContents();
+                updateCacheStatus();
+            } catch (error) {
+                addOutput('debugOutput', `キャッシュ削除エラー: ${error.message}`, true);
+            }
+        }
+
+        // ネットワークリクエスト
+        async function sendRequest() {
+            const url = document.getElementById('requestUrl').value;
+            const method = document.getElementById('requestMethod').value;
+
+            if (!url) {
+                showStatus('URLを入力してください', true);
+                return;
+            }
+
+            try {
+                const response = await fetch(url, { method });
+                const data = await response.text();
+
+                addOutput('requestOutput', `
+                    <strong>リクエスト:</strong> ${method} ${url}<br>
+                    <strong>ステータス:</strong> ${response.status} ${response.statusText}<br>
+                    <strong>レスポンス:</strong><br>
+                    <pre>${data.substring(0, 500)}${data.length > 500 ? '...' : ''}</pre>
+                `);
+
+                document.getElementById('lastRequest').textContent = new Date().toLocaleTimeString('ja-JP');
+                showStatus('リクエストが完了しました');
+            } catch (error) {
+                addOutput('requestOutput', `リクエストエラー: ${error.message}`, true);
+                showStatus('リクエストに失敗しました', true);
+            }
+        }
+
+        // 状態更新関数
+        async function updateServiceWorkerStatus() {
+            const registration = await navigator.serviceWorker.getRegistration();
+            const statusElement = document.getElementById('swStatus');
+
+            if (registration) {
+                if (registration.active) {
+                    statusElement.textContent = 'アクティブ';
+                    statusElement.className = 'status-value active';
+                } else if (registration.installing) {
+                    statusElement.textContent = 'インストール中';
+                    statusElement.className = 'status-value installing';
+                } else if (registration.waiting) {
+                    statusElement.textContent = '待機中';
+                    statusElement.className = 'status-value waiting';
+                }
+                document.getElementById('lastUpdate').textContent = new Date().toLocaleString('ja-JP');
+            } else {
+                statusElement.textContent = '未登録';
+                statusElement.className = 'status-value';
+            }
+        }
+
+        async function updateCacheStatus() {
+            try {
+                const cache = await caches.open('sw-cache-v1');
+                const requests = await cache.keys();
+                document.getElementById('cacheSize').textContent = `${requests.length} アイテム`;
+            } catch (error) {
+                document.getElementById('cacheSize').textContent = 'エラー';
+            }
+        }
+
+        function checkStatus() {
+            updateServiceWorkerStatus();
+            updateCacheStatus();
+            addOutput('debugOutput', '状態を更新しました');
+        }
+
+        // 通知機能
+        async function requestNotificationPermission() {
+            if (!('Notification' in window)) {
+                showStatus('このブラウザは通知をサポートしていません', true);
+                return;
+            }
+
+            const permission = await Notification.requestPermission();
+            document.getElementById('notificationPermission').textContent = permission;
+            addOutput('debugOutput', `通知許可状態: ${permission}`);
+
+            if (permission === 'granted') {
+                showStatus('通知が許可されました');
+            } else {
+                showStatus('通知が拒否されました', true);
+            }
+        }
+
+        function showNotification() {
+            const title = document.getElementById('notificationTitle').value;
+            const body = document.getElementById('notificationBody').value;
+
+            if (Notification.permission === 'granted') {
+                new Notification(title, { body });
+                addOutput('debugOutput', '通知を表示しました');
+                showStatus('通知を表示しました');
+            } else {
+                showStatus('通知が許可されていません', true);
+            }
+        }
+
+        async function showPersistentNotification() {
+            if (!serviceWorkerRegistration) {
+                showStatus('Service Worker が登録されていません', true);
+                return;
+            }
+
+            const title = document.getElementById('notificationTitle').value;
+            const body = document.getElementById('notificationBody').value;
+
+            try {
+                await serviceWorkerRegistration.showNotification(title, {
+                    body,
+                    icon: '/icon-192.png',
+                    badge: '/badge-72.png',
+                    tag: 'sample-notification'
+                });
+                addOutput('debugOutput', '永続通知を表示しました');
+                showStatus('永続通知を表示しました');
+            } catch (error) {
+                addOutput('debugOutput', `通知エラー: ${error.message}`, true);
+                showStatus('通知の表示に失敗しました', true);
+            }
+        }
+
+        // 初期化
+        window.addEventListener('load', async function() {
+            // ブラウザサポート確認
+            const browserSupport = document.getElementById('browserSupport');
+            if ('serviceWorker' in navigator) {
+                browserSupport.textContent = '対応';
+                browserSupport.className = 'status-value supported';
+            } else {
+                browserSupport.textContent = '非対応';
+                browserSupport.className = 'status-value unsupported';
+            }
+
+            // HTTPS確認
+            if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+                document.getElementById('httpsWarning').style.display = 'block';
+            }
+
+            // 通知許可状態確認
+            if ('Notification' in window) {
+                document.getElementById('notificationPermission').textContent = Notification.permission;
+            }
+
+            // ネットワーク状態確認
+            updateNetworkStatus();
+            window.addEventListener('online', updateNetworkStatus);
+            window.addEventListener('offline', updateNetworkStatus);
+
+            // 既存のService Worker確認
+            const registration = await navigator.serviceWorker.getRegistration();
+            if (registration) {
+                serviceWorkerRegistration = registration;
+                updateServiceWorkerStatus();
+            }
+
+            updateCacheStatus();
+        });
+
+        function updateNetworkStatus() {
+            const statusElement = document.getElementById('networkStatus');
+            if (navigator.onLine && !isOfflineMode) {
+                statusElement.textContent = 'オンライン';
+                statusElement.className = 'online';
+            } else {
+                statusElement.textContent = 'オフライン';
+                statusElement.className = 'offline';
+            }
+        }
+
+        // その他の機能（簡略化版）
+        function simulateOffline() {
+            isOfflineMode = true;
+            updateNetworkStatus();
+            showStatus('オフライン状態をシミュレート中');
+        }
+
+        function goOnline() {
+            isOfflineMode = false;
+            updateNetworkStatus();
+            showStatus('オンライン状態に戻しました');
+        }
+
+        function sendOfflineRequest() {
+            showStatus('オフライン時のリクエストは Service Worker が処理します');
+            sendRequest();
+        }
+
+        function registerBackgroundSync() {
+            showStatus('バックグラウンド同期は実装中です');
+        }
+
+        function triggerSync() {
+            showStatus('同期実行は実装中です');
+        }
+
+        function checkSyncStatus() {
+            showStatus('同期状態確認は実装中です');
+        }
+
+        function showServiceWorkerDetails() {
+            addOutput('debugOutput', 'Service Worker詳細表示は実装中です');
+        }
+
+        function showCacheDetails() {
+            listCacheContents();
+        }
+
+        function exportDebugInfo() {
+            showStatus('デバッグ情報エクスポートは実装中です');
+        }
+
+        function clearAllData() {
+            if (confirm('全てのデータを削除しますか？')) {
+                clearAllCache();
+                localStorage.clear();
+                sessionStorage.clear();
+                showStatus('全てのデータを削除しました');
+            }
+        }
+    </script>
+</body>
+</html>

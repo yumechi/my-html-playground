@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Workers サンプル</title>
+    <link rel="stylesheet" href="css/webworkers-style.css">
+</head>
+<body>
+    <h1>Web Workers サンプルアプリケーション</h1>
+
+    <div class="container">
+        <h2>Web Workersとは</h2>
+        <div class="info-section">
+            <p>Web Workers は、メインUIスレッドとは別のバックグラウンドスレッドでJavaScriptを実行する仕組みです。</p>
+            <ul>
+                <li>重い処理をバックグラウンドで実行</li>
+                <li>メインスレッドをブロックしない</li>
+                <li>並列処理によるパフォーマンス向上</li>
+                <li>DOM への直接アクセスは不可</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>基本的なWorker操作</h2>
+        <div class="worker-section">
+            <div class="form-group">
+                <label>メッセージ:</label>
+                <input type="text" id="messageInput" placeholder="Workerに送信するメッセージ" value="Hello, Worker!">
+            </div>
+            <div class="button-group">
+                <button onclick="startWorker()">Workerを開始</button>
+                <button onclick="sendMessage()">メッセージ送信</button>
+                <button onclick="stopWorker()" class="danger">Workerを停止</button>
+            </div>
+        </div>
+
+        <div class="output-section">
+            <h3>Worker からの応答:</h3>
+            <div id="workerOutput" class="output-display"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>重い計算処理のテスト</h2>
+        <div class="calculation-section">
+            <div class="form-group">
+                <label>計算範囲:</label>
+                <input type="number" id="calcRange" value="1000000" placeholder="計算の上限値">
+            </div>
+            <div class="button-group">
+                <button onclick="calculateInMain()">メインスレッドで計算</button>
+                <button onclick="calculateInWorker()">Workerで計算</button>
+            </div>
+            <div class="progress-section">
+                <div class="progress-bar">
+                    <div id="progressFill" class="progress-fill"></div>
+                </div>
+                <div id="progressText" class="progress-text">待機中...</div>
+            </div>
+        </div>
+
+        <div class="output-section">
+            <h3>計算結果:</h3>
+            <div id="calculationOutput" class="output-display"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>複数Workerの並列処理</h2>
+        <div class="parallel-section">
+            <div class="form-group">
+                <label>Worker数:</label>
+                <select id="workerCount">
+                    <option value="2">2個</option>
+                    <option value="4" selected>4個</option>
+                    <option value="8">8個</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>各Workerの処理数:</label>
+                <input type="number" id="taskCount" value="500000" placeholder="各Workerが処理するタスク数">
+            </div>
+            <div class="button-group">
+                <button onclick="runParallelWorkers()">並列処理開始</button>
+                <button onclick="stopAllWorkers()" class="danger">全Worker停止</button>
+            </div>
+        </div>
+
+        <div class="workers-status">
+            <h3>Worker状態:</h3>
+            <div id="workersStatus" class="workers-grid"></div>
+        </div>
+
+        <div class="output-section">
+            <h3>並列処理結果:</h3>
+            <div id="parallelOutput" class="output-display"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>エラーハンドリングテスト</h2>
+        <div class="error-section">
+            <div class="button-group">
+                <button onclick="triggerWorkerError()">Workerでエラー発生</button>
+                <button onclick="sendInvalidData()">不正なデータ送信</button>
+            </div>
+        </div>
+
+        <div class="output-section">
+            <h3>エラー情報:</h3>
+            <div id="errorOutput" class="output-display error-display"></div>
+        </div>
+    </div>
+
+    <div id="status" class="status"></div>
+
+    <script>
+        let mainWorker = null;
+        let calculationWorker = null;
+        let parallelWorkers = [];
+
+        function showStatus(message, isError = false) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${isError ? 'error' : 'success'}`;
+            setTimeout(() => {
+                statusDiv.textContent = '';
+                statusDiv.className = 'status';
+            }, 3000);
+        }
+
+        function addOutput(containerId, message, isError = false) {
+            const container = document.getElementById(containerId);
+            const timestamp = new Date().toLocaleTimeString('ja-JP');
+            const div = document.createElement('div');
+            div.className = `output-item ${isError ? 'error' : ''}`;
+            div.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${message}`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // 基本的なWorker操作
+        function startWorker() {
+            if (mainWorker) {
+                showStatus('Workerは既に実行中です', true);
+                return;
+            }
+
+            try {
+                mainWorker = new Worker('./js/basic-worker.js');
+
+                mainWorker.onmessage = function(e) {
+                    addOutput('workerOutput', `応答: ${e.data}`);
+                };
+
+                mainWorker.onerror = function(error) {
+                    addOutput('workerOutput', `エラー: ${error.message}`, true);
+                };
+
+                addOutput('workerOutput', 'Workerが開始されました');
+                showStatus('Workerを開始しました');
+            } catch (error) {
+                addOutput('workerOutput', `Worker開始エラー: ${error.message}`, true);
+                showStatus('Workerの開始に失敗しました', true);
+            }
+        }
+
+        function sendMessage() {
+            if (!mainWorker) {
+                showStatus('先にWorkerを開始してください', true);
+                return;
+            }
+
+            const message = document.getElementById('messageInput').value;
+            if (!message) {
+                showStatus('メッセージを入力してください', true);
+                return;
+            }
+
+            mainWorker.postMessage(message);
+            addOutput('workerOutput', `送信: ${message}`);
+        }
+
+        function stopWorker() {
+            if (mainWorker) {
+                mainWorker.terminate();
+                mainWorker = null;
+                addOutput('workerOutput', 'Workerが停止されました');
+                showStatus('Workerを停止しました');
+            } else {
+                showStatus('Workerは実行されていません', true);
+            }
+        }
+
+        // 重い計算処理
+        function calculateInMain() {
+            const range = parseInt(document.getElementById('calcRange').value);
+            if (!range || range <= 0) {
+                showStatus('有効な数値を入力してください', true);
+                return;
+            }
+
+            const startTime = performance.now();
+            updateProgress(0, `メインスレッドで計算中... (0/${range})`);
+
+            // メインスレッドでの計算（UIをブロックする）
+            setTimeout(() => {
+                let sum = 0;
+                for (let i = 1; i <= range; i++) {
+                    sum += Math.sqrt(i);
+                    if (i % 10000 === 0) {
+                        const progress = (i / range) * 100;
+                        updateProgress(progress, `メインスレッドで計算中... (${i}/${range})`);
+                    }
+                }
+
+                const endTime = performance.now();
+                const duration = (endTime - startTime).toFixed(2);
+                updateProgress(100, '計算完了');
+                addOutput('calculationOutput', `メインスレッド結果: ${sum.toFixed(2)} (${duration}ms)`);
+            }, 10);
+        }
+
+        function calculateInWorker() {
+            const range = parseInt(document.getElementById('calcRange').value);
+            if (!range || range <= 0) {
+                showStatus('有効な数値を入力してください', true);
+                return;
+            }
+
+            if (calculationWorker) {
+                calculationWorker.terminate();
+            }
+
+            calculationWorker = new Worker('./js/calculation-worker.js');
+
+            const startTime = performance.now();
+            updateProgress(0, `Workerで計算中... (0/${range})`);
+
+            calculationWorker.onmessage = function(e) {
+                const { type, data } = e.data;
+
+                if (type === 'progress') {
+                    const progress = (data.current / data.total) * 100;
+                    updateProgress(progress, `Workerで計算中... (${data.current}/${data.total})`);
+                } else if (type === 'result') {
+                    const endTime = performance.now();
+                    const duration = (endTime - startTime).toFixed(2);
+                    updateProgress(100, '計算完了');
+                    addOutput('calculationOutput', `Worker結果: ${data.result.toFixed(2)} (${duration}ms)`);
+                    calculationWorker.terminate();
+                    calculationWorker = null;
+                }
+            };
+
+            calculationWorker.onerror = function(error) {
+                addOutput('calculationOutput', `計算エラー: ${error.message}`, true);
+                updateProgress(0, 'エラーが発生しました');
+            };
+
+            calculationWorker.postMessage({ range: range });
+        }
+
+        function updateProgress(percentage, text) {
+            document.getElementById('progressFill').style.width = percentage + '%';
+            document.getElementById('progressText').textContent = text;
+        }
+
+        // 並列処理
+        function runParallelWorkers() {
+            const workerCount = parseInt(document.getElementById('workerCount').value);
+            const taskCount = parseInt(document.getElementById('taskCount').value);
+
+            stopAllWorkers();
+            parallelWorkers = [];
+
+            const startTime = performance.now();
+            let completedWorkers = 0;
+            const results = [];
+
+            updateWorkersStatus(workerCount, []);
+
+            for (let i = 0; i < workerCount; i++) {
+                const worker = new Worker('./js/parallel-worker.js');
+
+                worker.onmessage = function(e) {
+                    const { type, data, workerId } = e.data;
+
+                    if (type === 'result') {
+                        completedWorkers++;
+                        results[workerId] = data.result;
+
+                        updateWorkersStatus(workerCount, results);
+
+                        if (completedWorkers === workerCount) {
+                            const endTime = performance.now();
+                            const duration = (endTime - startTime).toFixed(2);
+                            const totalResult = results.reduce((sum, result) => sum + result, 0);
+
+                            addOutput('parallelOutput',
+                                `並列処理完了: 合計 ${totalResult.toFixed(2)} (${duration}ms, ${workerCount}個のWorker)`);
+                        }
+                    }
+                };
+
+                worker.onerror = function(error) {
+                    addOutput('parallelOutput', `Worker ${i} エラー: ${error.message}`, true);
+                };
+
+                worker.postMessage({
+                    workerId: i,
+                    taskCount: taskCount,
+                    startValue: i * taskCount
+                });
+
+                parallelWorkers.push(worker);
+            }
+
+            addOutput('parallelOutput', `${workerCount}個のWorkerで並列処理を開始`);
+        }
+
+        function updateWorkersStatus(totalWorkers, results) {
+            const container = document.getElementById('workersStatus');
+            container.innerHTML = '';
+
+            for (let i = 0; i < totalWorkers; i++) {
+                const workerDiv = document.createElement('div');
+                workerDiv.className = 'worker-status';
+
+                const status = results[i] !== undefined ? '完了' : '実行中';
+                const result = results[i] !== undefined ? results[i].toFixed(2) : '...';
+
+                workerDiv.innerHTML = `
+                    <div class="worker-id">Worker ${i}</div>
+                    <div class="worker-state ${status === '完了' ? 'completed' : 'running'}">${status}</div>
+                    <div class="worker-result">${result}</div>
+                `;
+
+                container.appendChild(workerDiv);
+            }
+        }
+
+        function stopAllWorkers() {
+            parallelWorkers.forEach(worker => worker.terminate());
+            parallelWorkers = [];
+            document.getElementById('workersStatus').innerHTML = '';
+            addOutput('parallelOutput', '全てのWorkerを停止しました');
+        }
+
+        // エラーハンドリング
+        function triggerWorkerError() {
+            const errorWorker = new Worker('./js/error-worker.js');
+
+            errorWorker.onmessage = function(e) {
+                addOutput('errorOutput', `メッセージ: ${e.data}`);
+            };
+
+            errorWorker.onerror = function(error) {
+                addOutput('errorOutput', `エラーキャッチ: ${error.message} (${error.filename}:${error.lineno})`, true);
+                errorWorker.terminate();
+            };
+
+            errorWorker.postMessage('trigger-error');
+        }
+
+        function sendInvalidData() {
+            if (!mainWorker) {
+                showStatus('先にWorkerを開始してください', true);
+                return;
+            }
+
+            // 循環参照を含むオブジェクトを送信（シリアライズエラーを引き起こす）
+            try {
+                const obj = {};
+                obj.self = obj;
+                mainWorker.postMessage(obj);
+            } catch (error) {
+                addOutput('errorOutput', `データ送信エラー: ${error.message}`, true);
+            }
+        }
+
+        // ページ離脱時のクリーンアップ
+        window.addEventListener('beforeunload', function() {
+            if (mainWorker) mainWorker.terminate();
+            if (calculationWorker) calculationWorker.terminate();
+            parallelWorkers.forEach(worker => worker.terminate());
+        });
+
+        // Web Workers サポート確認
+        window.addEventListener('load', function() {
+            if (typeof Worker === 'undefined') {
+                showStatus('このブラウザはWeb Workersをサポートしていません', true);
+                addOutput('workerOutput', 'Web Workersはサポートされていません', true);
+            } else {
+                addOutput('workerOutput', 'Web Workersが利用可能です');
+            }
+        });
+    </script>
+</body>
+</html>

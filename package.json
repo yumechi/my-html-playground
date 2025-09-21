@@ -1,0 +1,35 @@
+{
+  "name": "my-html-playground",
+  "version": "1.0.0",
+  "description": "HTML やブラウザの基礎的な機能を学習するためのサンプル集",
+  "main": "dist/index.html",
+  "scripts": {
+    "test": "playwright test",
+    "test:webworkers": "playwright test tests/webworkers.spec.js --project=chrome",
+    "test:serviceworkers": "playwright test tests/serviceworkers.spec.js --project=chrome",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "install-browsers": "playwright install",
+    "serve": "npx http-server dist -p 8080 -c-1",
+    "dev": "npm run serve"
+  },
+  "keywords": [
+    "html",
+    "javascript",
+    "browser",
+    "web-apis",
+    "indexeddb",
+    "web-storage",
+    "web-workers",
+    "service-workers"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.47.0",
+    "http-server": "^14.1.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
