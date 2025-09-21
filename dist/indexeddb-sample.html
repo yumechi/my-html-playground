@@ -119,6 +119,8 @@
         <button onclick="initDB()">データベース初期化</button>
         <button onclick="generateSampleData()">サンプルデータ生成</button>
         <button onclick="clearAllData()" class="danger">全データ削除</button>
+        <button onclick="deleteDatabase()" class="danger">データベース完全削除</button>
+        <button onclick="cleanExpiredData()">期限切れデータ削除</button>
         <div id="status" class="status"></div>
     </div>
     
@@ -139,6 +141,17 @@
         <div class="form-group">
             <label>職業:</label>
             <input type="text" id="itemJob" placeholder="職業を入力">
+        </div>
+        <div class="form-group">
+            <label>有効期限:</label>
+            <select id="itemTTL">
+                <option value="">無期限</option>
+                <option value="60000">1分</option>
+                <option value="300000">5分</option>
+                <option value="900000">15分</option>
+                <option value="3600000">1時間</option>
+                <option value="86400000">1日</option>
+            </select>
         </div>
         <button onclick="addOrUpdateData()">追加・更新</button>
     </div>
@@ -197,6 +210,7 @@
                     objectStore.createIndex('name', 'name', { unique: false });
                     objectStore.createIndex('age', 'age', { unique: false });
                     objectStore.createIndex('job', 'job', { unique: false });
+                    objectStore.createIndex('expiresAt', 'expiresAt', { unique: false });
                 }
             };
         }
@@ -207,12 +221,13 @@
                 return;
             }
 
+            const now = Date.now();
             const sampleData = [
-                { name: '田中太郎', age: 30, job: 'エンジニア' },
-                { name: '佐藤花子', age: 25, job: 'デザイナー' },
-                { name: '鈴木一郎', age: 35, job: 'マネージャー' },
-                { name: '高橋美咲', age: 28, job: 'マーケター' },
-                { name: '伊藤健太', age: 32, job: 'プロダクトオーナー' }
+                { name: '田中太郎', age: 30, job: 'エンジニア', createdAt: now },
+                { name: '佐藤花子', age: 25, job: 'デザイナー', createdAt: now },
+                { name: '鈴木一郎', age: 35, job: 'マネージャー', createdAt: now, expiresAt: now + 300000 },
+                { name: '高橋美咲', age: 28, job: 'マーケター', createdAt: now },
+                { name: '伊藤健太', age: 32, job: 'プロダクトオーナー', createdAt: now, expiresAt: now + 900000 }
             ];
 
             const transaction = db.transaction([STORE_NAME], 'readwrite');
@@ -243,6 +258,7 @@
             const name = document.getElementById('itemName').value;
             const age = parseInt(document.getElementById('itemAge').value);
             const job = document.getElementById('itemJob').value;
+            const ttl = document.getElementById('itemTTL').value;
 
             if (!name || !age || !job) {
                 showStatus('すべての項目を入力してください', true);
@@ -252,7 +268,11 @@
             const transaction = db.transaction([STORE_NAME], 'readwrite');
             const objectStore = transaction.objectStore(STORE_NAME);
 
-            const data = { name, age, job };
+            const now = Date.now();
+            const data = { name, age, job, createdAt: now };
+            if (ttl) {
+                data.expiresAt = now + parseInt(ttl);
+            }
             if (id) {
                 data.id = parseInt(id);
                 objectStore.put(data);
@@ -308,7 +328,9 @@
 
             request.onsuccess = function(event) {
                 const data = event.target.result;
-                displayData(data);
+                const now = Date.now();
+                const validData = data.filter(item => !item.expiresAt || item.expiresAt > now);
+                displayData(validData);
             };
         }
 
@@ -320,16 +342,27 @@
                 return;
             }
 
-            dataList.innerHTML = data.map(item => `
-                <div class="data-item">
-                    <strong>ID:</strong> ${item.id}<br>
-                    <strong>名前:</strong> ${item.name}<br>
-                    <strong>年齢:</strong> ${item.age}<br>
-                    <strong>職業:</strong> ${item.job}<br>
-                    <button onclick="editData(${item.id}, '${item.name}', ${item.age}, '${item.job}')">編集</button>
-                    <button onclick="deleteData(${item.id})" class="danger">削除</button>
-                </div>
-            `).join('');
+            const now = Date.now();
+            dataList.innerHTML = data.map(item => {
+                const createdDate = new Date(item.createdAt).toLocaleString('ja-JP');
+                let expiryInfo = '';
+                if (item.expiresAt) {
+                    const expiryDate = new Date(item.expiresAt).toLocaleString('ja-JP');
+                    const isExpired = item.expiresAt <= now;
+                    expiryInfo = `<br><strong>期限:</strong> <span style="color: ${isExpired ? 'red' : 'orange'}">${expiryDate}${isExpired ? ' (期限切れ)' : ''}</span>`;
+                }
+                return `
+                    <div class="data-item">
+                        <strong>ID:</strong> ${item.id}<br>
+                        <strong>名前:</strong> ${item.name}<br>
+                        <strong>年齢:</strong> ${item.age}<br>
+                        <strong>職業:</strong> ${item.job}<br>
+                        <strong>作成日時:</strong> ${createdDate}${expiryInfo}<br>
+                        <button onclick="editData(${item.id}, '${item.name}', ${item.age}, '${item.job}')">編集</button>
+                        <button onclick="deleteData(${item.id})" class="danger">削除</button>
+                    </div>
+                `;
+            }).join('');
         }
 
         function editData(id, name, age, job) {
@@ -389,12 +422,77 @@
             };
         }
 
+        function deleteDatabase() {
+            if (!confirm('データベース全体を完全に削除しますか？この操作は取り消せません。')) {
+                return;
+            }
+
+            if (db) {
+                db.close();
+            }
+
+            const deleteRequest = indexedDB.deleteDatabase(DB_NAME);
+            
+            deleteRequest.onsuccess = function() {
+                db = null;
+                showStatus('データベースを完全に削除しました');
+                document.getElementById('dataList').innerHTML = '<p>データがありません</p>';
+            };
+            
+            deleteRequest.onerror = function(event) {
+                console.error('データベース削除エラー:', event.target.error);
+                showStatus('データベースの削除に失敗しました', true);
+            };
+        }
+
+        function cleanExpiredData() {
+            if (!db) {
+                showStatus('先にデータベースを初期化してください', true);
+                return;
+            }
+
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const objectStore = transaction.objectStore(STORE_NAME);
+            const index = objectStore.index('expiresAt');
+            const now = Date.now();
+            
+            const range = IDBKeyRange.upperBound(now);
+            const request = index.openCursor(range);
+            let deletedCount = 0;
+
+            request.onsuccess = function(event) {
+                const cursor = event.target.result;
+                if (cursor) {
+                    cursor.delete();
+                    deletedCount++;
+                    cursor.continue();
+                }
+            };
+
+            transaction.oncomplete = function() {
+                showStatus(`期限切れデータ ${deletedCount} 件を削除しました`);
+                loadAllData();
+            };
+
+            transaction.onerror = function(event) {
+                console.error('期限切れデータ削除エラー:', event.target.error);
+                showStatus('期限切れデータの削除に失敗しました', true);
+            };
+        }
+
         function clearForm() {
             document.getElementById('itemId').value = '';
             document.getElementById('itemName').value = '';
             document.getElementById('itemAge').value = '';
             document.getElementById('itemJob').value = '';
+            document.getElementById('itemTTL').value = '';
         }
+
+        setInterval(function() {
+            if (db) {
+                loadAllData();
+            }
+        }, 30000);
 
         window.addEventListener('load', function() {
             initDB();
