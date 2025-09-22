@@ -1,0 +1,33 @@
+{
+  "name": "HTML Playground",
+  "dockerFile": "Dockerfile",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "workbench.colorTheme": "Tokyo Night Storm",
+        "files.associations": {
+          "*.html": "html",
+          "*.css": "css",
+          "*.js": "javascript"
+        },
+        "emmet.includeLanguages": {
+          "html": "html",
+          "css": "css"
+        },
+        "html.format.indentInnerHtml": true,
+        "html.format.wrapLineLength": 80,
+        "css.format.spaceAroundSelectorSeparator": true,
+        "editor.formatOnSave": true,
+        "editor.tabSize": 2,
+        "editor.insertSpaces": true
+      },
+      "extensions": [
+        "GitHub.copilot",
+        "enkia.tokyo-night"
+      ]
+    }
+  },
+  "forwardPorts": [3000, 8000, 8080],
+  "postCreateCommand": "echo 'Dev container setup complete!'",
+  "remoteUser": "vscode"
+}
