@@ -5,8 +5,10 @@
   "main": "dist/index.html",
   "scripts": {
     "test": "playwright test",
-    "test:webworkers": "playwright test tests/webworkers.spec.js --project=chrome",
-    "test:serviceworkers": "playwright test tests/serviceworkers.spec.js --project=chrome",
+    "test:docker": "playwright test --config=playwright.config.docker.js",
+    "test:podman": "./scripts/test-podman.sh",
+    "test:webworkers": "playwright test tests/webworkers.spec.js --project=chromium",
+    "test:serviceworkers": "playwright test tests/serviceworkers.spec.js --project=chromium",
     "test:headed": "playwright test --headed",
     "test:debug": "playwright test --debug",
     "install-browsers": "playwright install",

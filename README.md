@@ -95,6 +95,37 @@ npm run test:headed
 npm run test:debug
 ```
 
+### Podman/Docker環境でのテスト実行
+
+ローカル環境の影響を受けずに安定したテストを実行するため、Podman環境でのテスト実行もサポートしています。
+
+#### 前提条件
+- Podmanがインストールされていること
+
+#### 実行方法
+
+##### 全てのテストをPodman環境で実行
+```bash
+npm run test:podman
+# または直接実行
+./scripts/test-podman.sh
+```
+
+##### イメージを再ビルドしてテスト実行
+```bash
+./scripts/test-podman.sh --build
+```
+
+##### 特定のテストファイルのみ実行
+```bash
+./scripts/test-podman.sh --file tests/index.spec.js
+```
+
+#### 利点
+- ローカル環境に依存しない安定したテスト実行
+- クリーンな環境での検証
+- CI/CD環境との一貫性
+
 #### テスト内容
 
 ##### Web Workers テスト（11テストケース）
