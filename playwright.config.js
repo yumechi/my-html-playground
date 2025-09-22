@@ -30,11 +30,10 @@ module.exports = defineConfig({
   /* Configure projects for major browsers */
   projects: [
     {
-      name: 'chrome',
+      name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
-        // システムのChromeを使用
-        channel: 'chrome',
+        // Playwrightのchromiumを使用
         launchOptions: {
           args: [
             '--disable-dev-shm-usage',
